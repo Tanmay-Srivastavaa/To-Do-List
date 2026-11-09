@@ -46,7 +46,6 @@ pnpm-debug.log*
 *.sublime-project
 *.sublime-workspace
 .gemini/
-.antigravity/
 
 # 7. Testing & Coverage
 /coverage
