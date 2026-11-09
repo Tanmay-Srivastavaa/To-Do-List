@@ -1,0 +1,196 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ==========================================
+// AUTHENTICATION MODELS (NextAuth.js)
+// ==========================================
+
+model User {
+  id            String          @id @default(cuid())
+  name          String?
+  email         String?         @unique
+  emailVerified DateTime?
+  image         String?
+  planType      String          @default("Personal plan")
+  accounts      Account[]
+  sessions      Session[]
+  projects      Project[]
+  tasks         Task[]
+  labels        Label[]
+  comments      Comment[]
+  focusSessions FocusSession[]
+
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([email])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ==========================================
+// FOLIO CORE MODELS
+// ==========================================
+
+model Project {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String
+  subtitle    String?
+  colorHex    String   @default("#4E7D65")
+  icon        String   @default("layout")
+  isArchived  Boolean  @default(false)
+  sortOrder   Int      @default(0)
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks       Task[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+}
+
+enum TaskSection {
+  PRIORITIES
+  UP_NEXT
+  INBOX
+}
+
+enum PriorityFlag {
+  HIGH
+  MEDIUM
+  LOW
+  NONE
+}
+
+model Task {
+  id            String         @id @default(cuid())
+  userId        String
+  projectId     String?
+  title         String
+  description   String?        @db.Text
+  isCompleted   Boolean        @default(false)
+  completedAt   DateTime?
+  section       TaskSection    @default(UP_NEXT)
+  dueDate       DateTime?
+  dueTime       String?
+  priorityFlag  PriorityFlag   @default(NONE)
+  sortOrder     Int            @default(0)
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project       Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  labels        TaskLabel[]
+  comments      Comment[]
+  focusSessions FocusSession[]
+
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([userId, isCompleted])
+  @@index([userId, dueDate])
+  @@index([projectId])
+}
+
+model Label {
+  id        String      @id @default(cuid())
+  userId    String
+  name      String
+  colorHex  String?     @default("#D6CFC4")
+
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks     TaskLabel[]
+
+  createdAt DateTime    @default(now())
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+model TaskLabel {
+  taskId  String
+  labelId String
+
+  task    Task  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  label   Label @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, labelId])
+  @@index([taskId])
+  @@index([labelId])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  taskId    String
+  userId    String
+  content   String   @db.Text
+
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([taskId])
+  @@index([userId])
+}
+
+model FocusSession {
+  id              String    @id @default(cuid())
+  userId          String
+  taskId          String?
+  durationMinutes Int       @default(25)
+  startedAt       DateTime  @default(now())
+  completedAt     DateTime?
+  isCompleted     Boolean   @default(false)
+
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task            Task?     @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  createdAt       DateTime  @default(now())
+
+  @@index([userId, startedAt])
+}
+
